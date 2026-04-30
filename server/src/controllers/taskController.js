@@ -1,4 +1,5 @@
 import { Task, Project, User } from '../models/index.js';
+import { USER_ROLES } from '../config/constants.js';
 
 export const createTask = async (req, res) => {
   try {
@@ -103,12 +104,13 @@ export const updateTask = async (req, res) => {
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    // Only creator, assignee, or project owner can update
-    if (
-      task.createdById.toString() !== req.user.id &&
-      task.assignedToId?.toString() !== req.user.id &&
-      project.ownerId.toString() !== req.user.id
-    ) {
+    // Admin, creator, assignee, or project owner can update
+    const isAdmin = req.user.role === USER_ROLES.ADMIN;
+    const isCreator = task.createdById.toString() === req.user.id;
+    const isAssignee = task.assignedToId?.toString() === req.user.id;
+    const isOwner = project.ownerId.toString() === req.user.id;
+
+    if (!isAdmin && !isCreator && !isAssignee && !isOwner) {
       return res.status(403).json({ message: 'Forbidden: cannot update this task' });
     }
 
@@ -155,8 +157,12 @@ export const deleteTask = async (req, res) => {
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    // Only creator or project owner can delete
-    if (task.createdById.toString() !== req.user.id && project.ownerId.toString() !== req.user.id) {
+    // Admin, creator, or project owner can delete
+    const isAdmin = req.user.role === USER_ROLES.ADMIN;
+    const isCreator = task.createdById.toString() === req.user.id;
+    const isOwner = project.ownerId.toString() === req.user.id;
+
+    if (!isAdmin && !isCreator && !isOwner) {
       return res.status(403).json({ message: 'Forbidden: cannot delete this task' });
     }
 
@@ -167,4 +173,3 @@ export const deleteTask = async (req, res) => {
     res.status(500).json({ message: 'Failed to delete task', error: error.message });
   }
 };
-

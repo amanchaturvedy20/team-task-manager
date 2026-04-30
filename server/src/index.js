@@ -8,6 +8,7 @@ import projectRoutes from './routes/projects.js';
 import memberRoutes from './routes/members.js';
 import taskRoutes from './routes/tasks.js';
 import dashboardRoutes from './routes/dashboard.js';
+import adminRoutes from './routes/admin.js';
 
 dotenv.config();
 
@@ -28,6 +29,7 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/projects/:projectId/members', memberRoutes);
 app.use('/api/projects/:projectId/tasks', taskRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/admin', adminRoutes);
 
 // Health check
 app.get('/health', (req, res) => {
@@ -61,4 +63,3 @@ async function startServer() {
 startServer();
 
 export default app;
-

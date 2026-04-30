@@ -1,38 +1,47 @@
 import { Task, Project, ProjectMember, User } from '../models/index.js';
+import { USER_ROLES } from '../config/constants.js';
 
 export const getDashboard = async (req, res) => {
   try {
     const userId = req.user.id;
+    const isAdmin = req.user.role === USER_ROLES.ADMIN;
 
-    // Get all projects user owns or is member of
-    const ownedProjects = await Project.find({ ownerId: userId });
+    let allProjectIds;
 
-    const memberProjects = await ProjectMember.find({ userId }).populate('projectId');
+    if (isAdmin) {
+      // Admin sees all projects
+      const allProjects = await Project.find();
+      allProjectIds = allProjects.map((p) => p._id);
+    } else {
+      // Get all projects user owns or is member of
+      const ownedProjects = await Project.find({ ownerId: userId });
+      const memberProjects = await ProjectMember.find({ userId });
 
-    const allProjectIds = [
-      ...ownedProjects.map((p) => p._id),
-      ...memberProjects.map((m) => m.projectId._id),
-    ];
+      const ownedIds = ownedProjects.map((p) => p._id.toString());
+      const memberIds = memberProjects.map((m) => m.projectId.toString());
+      const uniqueIds = [...new Set([...ownedIds, ...memberIds])];
+      allProjectIds = uniqueIds;
+    }
+
+    // Get all tasks for these projects
+    const tasks = await Task.find({ projectId: { $in: allProjectIds } })
+      .populate('createdById', 'firstName lastName email')
+      .populate('assignedToId', 'firstName lastName email')
+      .populate('projectId', 'name');
+
+    // For admin, show all tasks; for member, show only their assigned tasks
+    const usersTasks = isAdmin
+      ? tasks
+      : tasks.filter((t) => t.assignedToId && t.assignedToId._id.toString() === userId);
 
     // Get task statistics
     const taskStats = {
-      total: 0,
-      todo: 0,
-      inProgress: 0,
-      completed: 0,
+      total: usersTasks.length,
+      todo: usersTasks.filter((t) => t.status === 'todo').length,
+      inProgress: usersTasks.filter((t) => t.status === 'in_progress').length,
+      completed: usersTasks.filter((t) => t.status === 'completed').length,
       overdue: 0,
     };
-
-    const tasks = await Task.find({ projectId: { $in: allProjectIds } })
-      .populate('createdById')
-      .populate('assignedToId');
-
-    const usersTasks = tasks.filter((t) => t.assignedToId?._id == userId);
-
-    taskStats.total = usersTasks.length;
-    taskStats.todo = usersTasks.filter((t) => t.status === 'todo').length;
-    taskStats.inProgress = usersTasks.filter((t) => t.status === 'in_progress').length;
-    taskStats.completed = usersTasks.filter((t) => t.status === 'completed').length;
 
     const now = new Date();
     taskStats.overdue = usersTasks.filter(
@@ -40,7 +49,7 @@ export const getDashboard = async (req, res) => {
     ).length;
 
     // Get recent tasks (last 10)
-    const recentTasks = usersTasks
+    const recentTasks = [...usersTasks]
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
       .slice(0, 10);
 
@@ -48,7 +57,11 @@ export const getDashboard = async (req, res) => {
     const projectOverview = await Promise.all(
       allProjectIds.map(async (projectId) => {
         const project = await Project.findById(projectId);
-        const projectTasks = tasks.filter((t) => t.projectId._id == projectId);
+        if (!project) return null;
+
+        const projectTasks = tasks.filter(
+          (t) => t.projectId && t.projectId._id.toString() === projectId.toString()
+        );
 
         return {
           id: project._id,
@@ -65,7 +78,7 @@ export const getDashboard = async (req, res) => {
     res.json({
       taskStats,
       recentTasks,
-      projectOverview,
+      projectOverview: projectOverview.filter(Boolean),
       totalProjects: allProjectIds.length,
     });
   } catch (error) {
@@ -108,4 +121,3 @@ export const getProjectStats = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch project stats', error: error.message });
   }
 };
-

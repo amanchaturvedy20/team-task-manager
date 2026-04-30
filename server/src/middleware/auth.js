@@ -31,6 +31,11 @@ export const authorizeProjectAccess = (allowedRoles) => {
       const { ProjectMember, Project } = await import('../models/index.js');
       const { projectId } = req.params;
 
+      // Admin has access to all projects
+      if (req.user.role === 'admin') {
+        return next();
+      }
+
       const project = await Project.findById(projectId);
       if (!project) {
         return res.status(404).json({ message: 'Project not found' });
@@ -58,4 +63,3 @@ export const authorizeProjectAccess = (allowedRoles) => {
     }
   };
 };
-

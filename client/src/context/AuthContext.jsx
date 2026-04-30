@@ -29,9 +29,14 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-  const signup = async (email, firstName, lastName, password) => {
+  const signup = async (email, firstName, lastName, password, role = 'member') => {
     try {
-      const { data } = await authAPI.signup(email, firstName, lastName, password);
+      const apiCall =
+        role === 'admin'
+          ? authAPI.adminSignup(email, firstName, lastName, password)
+          : authAPI.userSignup(email, firstName, lastName, password);
+
+      const { data } = await apiCall;
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       setToken(data.token);
@@ -42,9 +47,14 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (email, password) => {
+  const login = async (email, password, role = 'member') => {
     try {
-      const { data } = await authAPI.login(email, password);
+      const apiCall =
+        role === 'admin'
+          ? authAPI.adminLogin(email, password)
+          : authAPI.userLogin(email, password);
+
+      const { data } = await apiCall;
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       setToken(data.token);
@@ -62,6 +72,8 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  const isAdmin = user?.role === 'admin';
+
   const value = {
     user,
     token,
@@ -70,8 +82,8 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     isAuthenticated: !!token,
+    isAdmin,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-

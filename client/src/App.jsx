@@ -6,6 +6,7 @@ import { Login, Signup } from './pages/Auth';
 import { Projects } from './pages/Projects';
 import { ProjectDetail } from './pages/ProjectDetail';
 import { Dashboard } from './pages/Dashboard';
+import { AdminPanel } from './pages/AdminPanel';
 import './styles/index.css';
 
 function AppRoutes() {
@@ -64,6 +65,16 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <AdminPanel />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
 
       {/* Catch all */}
       <Route path="*" element={<Navigate to="/" replace />} />
@@ -80,4 +91,3 @@ export default function App() {
     </Router>
   );
 }
-

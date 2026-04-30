@@ -1,18 +1,20 @@
 import { ProjectMember, Project, User, Task } from '../models/index.js';
+import { USER_ROLES } from '../config/constants.js';
 
 export const addProjectMember = async (req, res) => {
   try {
     const { projectId } = req.params;
     const { userId, role } = req.validatedBody;
 
-    // Verify project exists and user is owner
+    // Verify project exists
     const project = await Project.findById(projectId);
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    if (project.ownerId.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Only project owner can add members' });
+    // Only owner or admin can add members
+    if (project.ownerId.toString() !== req.user.id && req.user.role !== USER_ROLES.ADMIN) {
+      return res.status(403).json({ message: 'Only project owner or admin can add members' });
     }
 
     // Verify user exists
@@ -37,7 +39,10 @@ export const addProjectMember = async (req, res) => {
       role,
     });
 
-    const memberWithUser = await ProjectMember.findById(member._id).populate('userId');
+    const memberWithUser = await ProjectMember.findById(member._id).populate(
+      'userId',
+      'firstName lastName email'
+    );
 
     res.status(201).json({
       message: 'Member added successfully',
@@ -77,8 +82,9 @@ export const removeProjectMember = async (req, res) => {
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    if (project.ownerId.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Only project owner can remove members' });
+    // Only owner or admin can remove members
+    if (project.ownerId.toString() !== req.user.id && req.user.role !== USER_ROLES.ADMIN) {
+      return res.status(403).json({ message: 'Only project owner or admin can remove members' });
     }
 
     const member = await ProjectMember.findById(memberId);
@@ -109,8 +115,9 @@ export const updateMemberRole = async (req, res) => {
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    if (project.ownerId.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Only project owner can change roles' });
+    // Only owner or admin can change roles
+    if (project.ownerId.toString() !== req.user.id && req.user.role !== USER_ROLES.ADMIN) {
+      return res.status(403).json({ message: 'Only project owner or admin can change roles' });
     }
 
     const member = await ProjectMember.findById(memberId);
@@ -126,7 +133,10 @@ export const updateMemberRole = async (req, res) => {
     member.role = role;
     await member.save();
 
-    const updatedMember = await ProjectMember.findById(memberId).populate('userId');
+    const updatedMember = await ProjectMember.findById(memberId).populate(
+      'userId',
+      'firstName lastName email'
+    );
 
     res.json({
       message: 'Member role updated successfully',
@@ -136,4 +146,3 @@ export const updateMemberRole = async (req, res) => {
     res.status(500).json({ message: 'Failed to update member role', error: error.message });
   }
 };
-

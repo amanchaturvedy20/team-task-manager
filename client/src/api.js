@@ -80,5 +80,13 @@ export const dashboardAPI = {
   getProjectStats: (projectId) => api.get(`/dashboard/project/${projectId}`),
 };
 
-export default api;
+// Admin APIs
+export const adminAPI = {
+  getUsers: (params = {}) => api.get('/admin/users', { params }),
+  updateUserRole: (userId, role) => api.put(`/admin/users/${userId}/role`, { role }),
+  toggleUserActive: (userId) => api.put(`/admin/users/${userId}/toggle-active`),
+  getSystemStats: () => api.get('/admin/stats'),
+  getAllProjects: () => api.get('/admin/projects'),
+};
 
+export default api;

@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 export const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState('member');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
@@ -17,7 +18,7 @@ export const Login = () => {
     setLoading(true);
 
     try {
-      await login(email, password);
+      await login(email, password, role);
       navigate('/');
     } catch (err) {
       setError(err.message || 'Login failed');
@@ -31,6 +32,23 @@ export const Login = () => {
       <div className="auth-card">
         <h1>Login</h1>
         <p>Welcome back to Task Manager</p>
+
+        <div className="role-toggle">
+          <button
+            type="button"
+            className={`role-btn ${role === 'member' ? 'active' : ''}`}
+            onClick={() => setRole('member')}
+          >
+            👤 Member
+          </button>
+          <button
+            type="button"
+            className={`role-btn ${role === 'admin' ? 'active' : ''}`}
+            onClick={() => setRole('admin')}
+          >
+            🛡️ Admin
+          </button>
+        </div>
 
         {error && <div className="alert alert-error">{error}</div>}
 
@@ -58,7 +76,7 @@ export const Login = () => {
           </div>
 
           <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? 'Logging in...' : 'Login'}
+            {loading ? 'Logging in...' : `Login as ${role === 'admin' ? 'Admin' : 'Member'}`}
           </button>
         </form>
 
@@ -68,7 +86,8 @@ export const Login = () => {
 
         <div className="demo-info">
           <p><strong>Demo Accounts:</strong></p>
-          <p>Email: alice@example.com<br/>Password: password123</p>
+          <p>Admin: admin@example.com / password123</p>
+          <p>Member: alice@example.com / password123</p>
         </div>
       </div>
     </div>
@@ -83,6 +102,7 @@ export const Signup = () => {
     password: '',
     confirmPassword: '',
   });
+  const [role, setRole] = useState('member');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { signup } = useAuth();
@@ -105,7 +125,7 @@ export const Signup = () => {
 
     try {
       const { email, firstName, lastName, password } = formData;
-      await signup(email, firstName, lastName, password);
+      await signup(email, firstName, lastName, password, role);
       navigate('/');
     } catch (err) {
       setError(err.message || 'Signup failed');
@@ -119,6 +139,23 @@ export const Signup = () => {
       <div className="auth-card">
         <h1>Sign Up</h1>
         <p>Create a new account</p>
+
+        <div className="role-toggle">
+          <button
+            type="button"
+            className={`role-btn ${role === 'member' ? 'active' : ''}`}
+            onClick={() => setRole('member')}
+          >
+            👤 Member
+          </button>
+          <button
+            type="button"
+            className={`role-btn ${role === 'admin' ? 'active' : ''}`}
+            onClick={() => setRole('admin')}
+          >
+            🛡️ Admin
+          </button>
+        </div>
 
         {error && <div className="alert alert-error">{error}</div>}
 
@@ -184,7 +221,7 @@ export const Signup = () => {
           </div>
 
           <button type="submit" className="btn btn-primary" disabled={loading}>
-            {loading ? 'Creating account...' : 'Sign Up'}
+            {loading ? 'Creating account...' : `Sign Up as ${role === 'admin' ? 'Admin' : 'Member'}`}
           </button>
         </form>
 
@@ -195,4 +232,3 @@ export const Signup = () => {
     </div>
   );
 };
-

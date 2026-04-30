@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { projectAPI, taskAPI } from '../api';
+import { projectAPI, taskAPI, memberAPI } from '../api';
+import { useAuth } from '../context/AuthContext';
 import './ProjectDetail.css';
 
 export const ProjectDetail = () => {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const { user, isAdmin } = useAuth();
   const [project, setProject] = useState(null);
   const [tasks, setTasks] = useState([]);
+  const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('tasks');
@@ -16,12 +19,14 @@ export const ProjectDetail = () => {
     description: '',
     priority: 'medium',
     dueDate: '',
+    assignedToId: '',
   });
   const [filterStatus, setFilterStatus] = useState('');
 
   useEffect(() => {
     loadProject();
     loadTasks();
+    loadMembers();
   }, [projectId]);
 
   const loadProject = async () => {
@@ -38,15 +43,26 @@ export const ProjectDetail = () => {
 
   const loadTasks = async () => {
     try {
-      const { data } = await taskAPI.getTasks(projectId, { status: filterStatus });
+      const filters = {};
+      if (filterStatus) filters.status = filterStatus;
+      const { data } = await taskAPI.getTasks(projectId, filters);
       setTasks(data);
     } catch (err) {
       setError('Failed to load tasks');
     }
   };
 
+  const loadMembers = async () => {
+    try {
+      const { data } = await memberAPI.getMembers(projectId);
+      setMembers(data);
+    } catch (err) {
+      // Members may fail if not authorized, that's okay
+    }
+  };
+
   useEffect(() => {
-    loadTasks();
+    if (projectId) loadTasks();
   }, [filterStatus]);
 
   const handleCreateTask = async (e) => {
@@ -54,9 +70,13 @@ export const ProjectDetail = () => {
     if (!newTask.title.trim()) return;
 
     try {
-      const { data } = await taskAPI.createTask(projectId, newTask);
+      const taskData = { ...newTask };
+      if (!taskData.assignedToId) delete taskData.assignedToId;
+      if (!taskData.dueDate) delete taskData.dueDate;
+
+      const { data } = await taskAPI.createTask(projectId, taskData);
       setTasks([...tasks, data.task]);
-      setNewTask({ title: '', description: '', priority: 'medium', dueDate: '' });
+      setNewTask({ title: '', description: '', priority: 'medium', dueDate: '', assignedToId: '' });
       setError('');
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to create task');
@@ -66,7 +86,7 @@ export const ProjectDetail = () => {
   const handleTaskStatusChange = async (taskId, newStatus) => {
     try {
       const { data } = await taskAPI.updateTask(projectId, taskId, { status: newStatus });
-      setTasks(tasks.map((t) => (t.id === taskId ? data.task : t)));
+      setTasks(tasks.map((t) => (t._id === taskId ? data.task : t)));
     } catch (err) {
       setError('Failed to update task');
     }
@@ -77,7 +97,7 @@ export const ProjectDetail = () => {
 
     try {
       await taskAPI.deleteTask(projectId, taskId);
-      setTasks(tasks.filter((t) => t.id !== taskId));
+      setTasks(tasks.filter((t) => t._id !== taskId));
     } catch (err) {
       setError('Failed to delete task');
     }
@@ -93,6 +113,9 @@ export const ProjectDetail = () => {
       setError('Failed to delete project');
     }
   };
+
+  const isOwner = project && user && project.ownerId?._id === user.id;
+  const canDeleteProject = isOwner || isAdmin;
 
   if (loading) {
     return (
@@ -131,9 +154,11 @@ export const ProjectDetail = () => {
             </div>
           </div>
         </div>
-        <button onClick={handleDeleteProject} className="btn btn-danger">
-          Delete Project
-        </button>
+        {canDeleteProject && (
+          <button onClick={handleDeleteProject} className="btn btn-danger">
+            Delete Project
+          </button>
+        )}
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
@@ -149,7 +174,7 @@ export const ProjectDetail = () => {
           className={`tab-btn ${activeTab === 'members' ? 'active' : ''}`}
           onClick={() => setActiveTab('members')}
         >
-          Members ({project.members?.length || 0})
+          Members ({members.length})
         </button>
       </div>
 
@@ -162,6 +187,7 @@ export const ProjectDetail = () => {
                 <option value="todo">To Do</option>
                 <option value="in_progress">In Progress</option>
                 <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
               </select>
             </div>
           </div>
@@ -197,6 +223,19 @@ export const ProjectDetail = () => {
                     onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
                   />
                 </div>
+                <div className="form-group">
+                  <select
+                    value={newTask.assignedToId}
+                    onChange={(e) => setNewTask({ ...newTask, assignedToId: e.target.value })}
+                  >
+                    <option value="">Assign to...</option>
+                    {members.map((m) => (
+                      <option key={m._id} value={m.userId?._id}>
+                        {m.userId?.firstName} {m.userId?.lastName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
               <div className="form-group">
                 <textarea
@@ -217,7 +256,7 @@ export const ProjectDetail = () => {
               <div className="empty-state">No tasks found</div>
             ) : (
               tasks.map((task) => (
-                <div key={task.id} className="task-card card">
+                <div key={task._id} className="task-card card">
                   <div className="task-header">
                     <h4>{task.title}</h4>
                     <span className={`badge badge-${getPriorityColor(task.priority)}`}>
@@ -226,11 +265,13 @@ export const ProjectDetail = () => {
                   </div>
                   {task.description && <p className="task-desc">{task.description}</p>}
                   <div className="task-meta">
-                    {task.assignedTo && (
-                      <span className="assigned">👤 {task.assignedTo.firstName}</span>
+                    {task.assignedToId && (
+                      <span className="assigned">
+                        👤 {task.assignedToId.firstName} {task.assignedToId.lastName}
+                      </span>
                     )}
                     {task.dueDate && (
-                      <span className="due-date">
+                      <span className={`due-date ${new Date(task.dueDate) < new Date() && task.status !== 'completed' ? 'overdue' : ''}`}>
                         📅 {new Date(task.dueDate).toLocaleDateString()}
                       </span>
                     )}
@@ -238,7 +279,7 @@ export const ProjectDetail = () => {
                   <div className="task-actions">
                     <select
                       value={task.status}
-                      onChange={(e) => handleTaskStatusChange(task.id, e.target.value)}
+                      onChange={(e) => handleTaskStatusChange(task._id, e.target.value)}
                       className="status-select"
                     >
                       <option value="todo">To Do</option>
@@ -247,7 +288,7 @@ export const ProjectDetail = () => {
                       <option value="cancelled">Cancelled</option>
                     </select>
                     <button
-                      onClick={() => handleDeleteTask(task.id)}
+                      onClick={() => handleDeleteTask(task._id)}
                       className="btn btn-danger btn-small"
                     >
                       Delete
@@ -264,13 +305,15 @@ export const ProjectDetail = () => {
         <div className="members-section">
           <div className="card">
             <h3>Project Members</h3>
-            {project.members && project.members.length > 0 ? (
+            {members.length > 0 ? (
               <div className="members-list">
-                {project.members.map((member) => (
-                  <div key={member.id} className="member-item">
+                {members.map((member) => (
+                  <div key={member._id} className="member-item">
                     <div className="member-info">
-                      <strong>{member.user.firstName} {member.user.lastName}</strong>
-                      <span className="member-email">{member.user.email}</span>
+                      <strong>
+                        {member.userId?.firstName} {member.userId?.lastName}
+                      </strong>
+                      <span className="member-email">{member.userId?.email}</span>
                     </div>
                     <span className={`role-badge role-${member.role}`}>{member.role}</span>
                   </div>
@@ -298,4 +341,3 @@ function getPriorityColor(priority) {
       return 'primary';
   }
 }
-

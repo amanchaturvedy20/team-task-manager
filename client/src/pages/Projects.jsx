@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { projectAPI } from '../api';
+import { useAuth } from '../context/AuthContext';
 import './Projects.css';
 
 export const Projects = () => {
@@ -9,6 +10,7 @@ export const Projects = () => {
   const [newProject, setNewProject] = useState({ name: '', description: '' });
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
+  const { user } = useAuth();
 
   useEffect(() => {
     loadProjects();
@@ -86,15 +88,20 @@ export const Projects = () => {
         </div>
 
         {projects.map((project) => (
-          <Link key={project.id} to={`/project/${project.id}`} className="card project-card">
+          <Link key={project._id} to={`/project/${project._id}`} className="card project-card">
             <div className="project-card-header">
               <h3>{project.name}</h3>
-              <span className="badge badge-primary">{project.status}</span>
+              <div className="project-badges">
+                {project.ownerId?._id === user?.id && (
+                  <span className="badge badge-owner">Owner</span>
+                )}
+                <span className="badge badge-primary">{project.status}</span>
+              </div>
             </div>
             <p className="project-description">{project.description}</p>
             <div className="project-meta">
-              <span>{project.members?.length || 0} members</span>
-              <span>{project.tasks?.length || 0} tasks</span>
+              <span>👥 {project.members?.length || 0} members</span>
+              <span>📋 {project.tasks?.length || 0} tasks</span>
             </div>
           </Link>
         ))}
@@ -108,4 +115,3 @@ export const Projects = () => {
     </div>
   );
 };
-

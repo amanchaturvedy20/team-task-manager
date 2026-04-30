@@ -21,10 +21,27 @@ const projectSchema = new mongoose.Schema(
       default: 'active',
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  }
 );
+
+// Virtual for project members
+projectSchema.virtual('members', {
+  ref: 'ProjectMember',
+  localField: '_id',
+  foreignField: 'projectId',
+});
+
+// Virtual for project tasks
+projectSchema.virtual('tasks', {
+  ref: 'Task',
+  localField: '_id',
+  foreignField: 'projectId',
+});
 
 const Project = mongoose.model('Project', projectSchema);
 
 export default Project;
-

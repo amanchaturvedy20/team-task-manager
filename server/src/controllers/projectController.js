@@ -1,5 +1,5 @@
 import { Project, ProjectMember, User, Task } from '../models/index.js';
-import { PROJECT_MEMBERS_ROLES } from '../config/constants.js';
+import { PROJECT_MEMBERS_ROLES, USER_ROLES } from '../config/constants.js';
 
 export const createProject = async (req, res) => {
   try {
@@ -18,7 +18,7 @@ export const createProject = async (req, res) => {
       role: PROJECT_MEMBERS_ROLES.OWNER,
     });
 
-    const projectWithMembers = await Project.findById(project._id)
+    const projectWithRelations = await Project.findById(project._id)
       .populate('ownerId', 'firstName lastName email')
       .populate({
         path: 'members',
@@ -27,7 +27,7 @@ export const createProject = async (req, res) => {
 
     res.status(201).json({
       message: 'Project created successfully',
-      project: projectWithMembers,
+      project: projectWithRelations,
     });
   } catch (error) {
     res.status(500).json({ message: 'Failed to create project', error: error.message });
@@ -36,12 +36,37 @@ export const createProject = async (req, res) => {
 
 export const getProjects = async (req, res) => {
   try {
-    const projects = await Project.find({ ownerId: req.user.id })
-      .populate('ownerId', 'firstName lastName email')
-      .populate({
-        path: 'members',
-        populate: { path: 'userId', select: 'firstName lastName email' },
-      });
+    let projects;
+
+    if (req.user.role === USER_ROLES.ADMIN) {
+      // Admin sees ALL projects
+      projects = await Project.find()
+        .populate('ownerId', 'firstName lastName email')
+        .populate({
+          path: 'members',
+          populate: { path: 'userId', select: 'firstName lastName email' },
+        })
+        .populate('tasks');
+    } else {
+      // Get projects user owns
+      const ownedProjects = await Project.find({ ownerId: req.user.id });
+      const ownedIds = ownedProjects.map((p) => p._id);
+
+      // Get projects user is a member of
+      const memberships = await ProjectMember.find({ userId: req.user.id });
+      const memberProjectIds = memberships.map((m) => m.projectId);
+
+      // Combine unique IDs
+      const allIds = [...new Set([...ownedIds.map(String), ...memberProjectIds.map(String)])];
+
+      projects = await Project.find({ _id: { $in: allIds } })
+        .populate('ownerId', 'firstName lastName email')
+        .populate({
+          path: 'members',
+          populate: { path: 'userId', select: 'firstName lastName email' },
+        })
+        .populate('tasks');
+    }
 
     res.json(projects);
   } catch (error) {
@@ -87,9 +112,9 @@ export const updateProject = async (req, res) => {
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    // Only owner can update project
-    if (project.ownerId.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Only project owner can update' });
+    // Only owner or admin can update project
+    if (project.ownerId.toString() !== req.user.id && req.user.role !== USER_ROLES.ADMIN) {
+      return res.status(403).json({ message: 'Only project owner or admin can update' });
     }
 
     if (name) project.name = name;
@@ -123,9 +148,9 @@ export const deleteProject = async (req, res) => {
       return res.status(404).json({ message: 'Project not found' });
     }
 
-    // Only owner can delete
-    if (project.ownerId.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Only project owner can delete' });
+    // Only owner or admin can delete
+    if (project.ownerId.toString() !== req.user.id && req.user.role !== USER_ROLES.ADMIN) {
+      return res.status(403).json({ message: 'Only project owner or admin can delete' });
     }
 
     // Delete all related tasks
@@ -140,4 +165,3 @@ export const deleteProject = async (req, res) => {
     res.status(500).json({ message: 'Failed to delete project', error: error.message });
   }
 };
-

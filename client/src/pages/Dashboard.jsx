@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { dashboardAPI } from '../api';
+import { useAuth } from '../context/AuthContext';
 import './Dashboard.css';
 
 export const Dashboard = () => {
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const { isAdmin } = useAuth();
 
   useEffect(() => {
     loadDashboard();
@@ -39,7 +42,8 @@ export const Dashboard = () => {
 
   return (
     <div className="dashboard">
-      <h1>Dashboard</h1>
+      <h1>{isAdmin ? '🛡️ Admin Dashboard' : '📊 Dashboard'}</h1>
+      {isAdmin && <p className="dashboard-subtitle">Showing system-wide statistics</p>}
 
       <div className="stats-grid">
         <div className="stat-card">
@@ -51,7 +55,7 @@ export const Dashboard = () => {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon">✅</div>
+          <div className="stat-icon">📝</div>
           <div className="stat-content">
             <h3>To Do</h3>
             <p className="stat-value">{stats.todo}</p>
@@ -67,7 +71,7 @@ export const Dashboard = () => {
         </div>
 
         <div className="stat-card">
-          <div className="stat-icon">✔️</div>
+          <div className="stat-icon">✅</div>
           <div className="stat-content">
             <h3>Completed</h3>
             <p className="stat-value">{stats.completed}</p>
@@ -89,12 +93,14 @@ export const Dashboard = () => {
           {dashboard.recentTasks.length > 0 ? (
             <div className="tasks-list">
               {dashboard.recentTasks.map((task) => (
-                <div key={task.id} className="task-item">
+                <div key={task._id} className="task-item">
                   <div className="task-title">{task.title}</div>
                   <div className="task-details">
-                    <span className={`status-badge status-${task.status}`}>{task.status}</span>
+                    <span className={`status-badge status-${task.status}`}>
+                      {task.status.replace('_', ' ')}
+                    </span>
                     {task.dueDate && (
-                      <span className="due-date">
+                      <span className={`due-date ${new Date(task.dueDate) < new Date() && task.status !== 'completed' ? 'overdue' : ''}`}>
                         {new Date(task.dueDate).toLocaleDateString()}
                       </span>
                     )}
@@ -103,7 +109,9 @@ export const Dashboard = () => {
               ))}
             </div>
           ) : (
-            <p className="empty-text">No tasks assigned to you yet</p>
+            <p className="empty-text">
+              {isAdmin ? 'No tasks in the system yet' : 'No tasks assigned to you yet'}
+            </p>
           )}
         </div>
 
@@ -112,7 +120,11 @@ export const Dashboard = () => {
           {dashboard.projectOverview.length > 0 ? (
             <div className="projects-overview">
               {dashboard.projectOverview.map((project) => (
-                <div key={project.id} className="project-overview-item">
+                <Link
+                  key={project.id}
+                  to={`/project/${project.id}`}
+                  className="project-overview-item"
+                >
                   <h4>{project.name}</h4>
                   <div className="progress-bar">
                     <div
@@ -134,7 +146,7 @@ export const Dashboard = () => {
                       <span className="overdue-badge">{project.overdueTasks} overdue</span>
                     )}
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           ) : (
@@ -145,4 +157,3 @@ export const Dashboard = () => {
     </div>
   );
 };
-
